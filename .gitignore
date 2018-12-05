@@ -1,0 +1,4 @@
+target/*
+*/target/*
+*.class
+target
