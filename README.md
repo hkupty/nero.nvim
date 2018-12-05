@@ -44,7 +44,8 @@ Other commands are intended to be implemented in the future.
 - [ ] Better lua support
 - [ ] Better viml support
 - [ ] Better REPL handling:
- - [ ] History (arrows);
- - [ ] Clear REPL;
- - [ ] Docs;
+  - [ ] Autocompletion;
+  - [ ] History (arrows);
+  - [ ] Clear REPL;
+  - [ ] Docs;
 - [ ] Compile with graal-vm.
