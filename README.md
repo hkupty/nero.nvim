@@ -7,9 +7,6 @@ current lua state.
 
 # How to get that working:
 
-- `mvn install` on [neovim-java/core-rpc](https://github.com/esensar/neovim-java/tree/master/core-rpc);
-  - You must use at least version `0.1.12` (because of [this PR](https://github.com/esensar/neovim-java/pull/77)).
-
 - `:call serverstart("127.0.0.1:12345")` on neovim;
   - (until propert argument handling is implemented)
 
@@ -42,6 +39,7 @@ Other commands are intended to be implemented in the future.
 
 - [ ] Build scripts to generate a single executable and/or shortcut;
 - [ ] Better lua support
+  - [x] Return values for expressions
 - [ ] Better viml support
 - [ ] Better REPL handling:
   - [ ] Autocompletion;
