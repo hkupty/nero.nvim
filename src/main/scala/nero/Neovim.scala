@@ -31,34 +31,51 @@ object Neovim {
     }
 
     def send(lang: Lang, cmd: String, args: String*): String = {
-      val result: Promise[String] = Promise()
-      val request = lang match {
+      def run(success: Object => String, failure: RPCError => String): RequestMessage.Builder => String = { request =>
+        val result: Promise[String] = Promise()
+
+        def handle(id: Int, response: ResponseMessage) ={
+          result.success(
+            Option(response.getError())
+              .fold(success(response.getResult()))(failure)
+            )
+        }
+
+        client.send(request, handle)
+        Await.result(result.future, timeout)
+      }
+
+      val request: RequestMessage.Builder = lang match {
         case Lua => new RequestMessage.Builder("nvim_execute_lua")
-          .addArgument(cmd)
+          .addArgument(s"return ${cmd}")
           .addArgument(args.toArray)
-          //.addArgument("luaeval")
-          //.addArgument(Seq(cmd).toArray)
 
         case VimL => new RequestMessage.Builder("nvim_command")
           .addArgument(s"execute '${cmd}'")
       }
 
-      client.send(request, (id, response) => {
+      val success: Object => String = obj => Option(obj).fold("[OK ]")(v => s"[OK  ]   ${v.toString}")
+      val defaultFailure: RPCError => String = err => {
+        System.out.println(err)
+        s"[Err ]   ${err.getMessage()}"
+      }
 
-        Option(response.getError()).fold{
-          result
-            .success(Option(response.getResult())
-            .map(x => s"[OK  ]   ${x.toString}")
-            .getOrElse("[OK  ]"))
-          }{err =>
-            //TODO: Deal with errors on printing
-            //result.failure(NeovimError(err.message))
-            result.success(s"[Err ]   ${err.getMessage()}")
-          }
+      val failure: RPCError => String = lang match {
+        case Lua => { err =>
 
-      })
+          val newMsg: RequestMessage.Builder = new RequestMessage.Builder("nvim_execute_lua")
+            .addArgument(cmd)
+            .addArgument(args.toArray)
 
-      Await.result(result.future, timeout)
+            // run(success, defaultFailure)(newMsg)
+            ""
+
+
+        }
+        case _ => defaultFailure
+      }
+
+      run(success, failure)(request)
     }
 
     def close(): Unit = {
