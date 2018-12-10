@@ -1,0 +1,6 @@
+#!/bin/bash
+BIN_DIR="$(dirname "$(realpath "$0")")"
+NERO_DIR="$(dirname "$BIN_DIR")"
+INSTALL_DIR="$NERO_DIR/target/scala-2.12"
+
+java -jar "$INSTALL_DIR/nero.jar"

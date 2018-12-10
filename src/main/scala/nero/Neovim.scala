@@ -12,10 +12,18 @@ sealed trait Lang
 case object Lua extends Lang
 case object VimL extends Lang
 
-case class NeovimError(message: String) extends NoStackTrace
+trait ReplResponse {
+  val message: String
+}
+
+case class NeovimError(val message: String) extends NoStackTrace with ReplResponse
+case class NeovimMessage(val message: String) extends ReplResponse
+case object NeovimNop extends ReplResponse {
+  val message: String = ""
+}
 
 trait Neovim {
-  def send(lang: Lang, cmd: String, args: String*): String
+  def send(lang: Lang, cmd: String, args: String*): ReplResponse
   def close(): Unit
 }
 
@@ -33,12 +41,12 @@ object Neovim {
       rpcStreamer
     }
 
-    def send(lang: Lang, cmd: String, args: String*): String = {
+    def send(lang: Lang, cmd: String, args: String*): ReplResponse = {
       type MarkSuccess[A] = (Promise[A], Object) => Unit
       type MarkFailure[A] = (Promise[A], RPCError) => Unit
 
-      def run(success: MarkSuccess[String], failure: MarkFailure[String]): RequestMessage.Builder => Future[String] = { request =>
-        val result: Promise[String] = Promise()
+      def run(success: MarkSuccess[ReplResponse], failure: MarkFailure[ReplResponse]): RequestMessage.Builder => Future[ReplResponse] = { request =>
+        val result: Promise[ReplResponse] = Promise()
 
         def handle(id: Int, response: ResponseMessage) ={
             Option(response.getError()).fold(success(result, response.getResult()))(f => failure(result, f))
@@ -58,28 +66,30 @@ object Neovim {
           .addArgument(s"execute '${cmd}'")
       }
 
-      val success: MarkSuccess[String] = (p, obj) => p.success(
-        Option(obj)
-          .fold("[OK  ]")(v => s"[OK  ]   ${v.toString}")
+      val success: MarkSuccess[ReplResponse] = (p, obj) => p.success(Option(obj)
+        .fold[ReplResponse](NeovimNop)(v => NeovimMessage(v.toString))
       )
 
-      val failure: MarkFailure[String] = lang match {
+      val handleFailure: MarkFailure[ReplResponse] = (p, err) => p.success(NeovimError(err.getMessage())) 
+
+      val failure: MarkFailure[ReplResponse] = lang match {
         case Lua => { (p, err) => p.failure(NeovimError(err.getMessage())) }
-        case _ => { (p, err) => p.success(s"[Err ]   ${err.getMessage()}") }
+        case _ => handleFailure
       }
 
-     val resolve: PartialFunction[Throwable, Future[String]] = lang match{
+     val resolve: PartialFunction[Throwable, Future[ReplResponse]] = 
+       lang match{
        case Lua => {
          case err => {
           val newMsg: RequestMessage.Builder = new RequestMessage.Builder("nvim_execute_lua")
             .addArgument(cmd)
             .addArgument(args.toArray)
 
-            run(success, failure)(newMsg)
+            run(success, handleFailure)(newMsg)
          }
        }
        case _ => {
-         case err => Future.successful(s"[Err ]   ${err.getMessage()}")
+         case err => Future.successful(NeovimError(err.getMessage()))
        }
      }
 
