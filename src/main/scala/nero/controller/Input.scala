@@ -15,7 +15,9 @@ class Input(pipe: Pipe[ReplState, ReplState]) extends Pipe[ReplState, ReplState]
   }
 
   def send(state: ReplState): ReplState = {
-    val msg = StdIn.readLine(promptStr(state.mode))
-    pipe.send(state.append(msg))
+    Option(StdIn.readLine(promptStr(state.mode)))
+      .fold(state.withMode(Mode.Closed)){ data =>
+      pipe.send(state.append(data))
+    }
   }
 }
